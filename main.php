@@ -58,29 +58,22 @@ if ($userId == $adminID) {
 // Commands
 switch ($text) {
     case "/start":
-        sendMessage($chatId, "🚀 <b>Welcome to Mobile Info Bot</b>\nSend any 10-digit number to scan.\n💳 Credits: <b>{$credits[$userId]}</b>");
+        sendMessage($chatId, "🟢 <b>Welcome to Digital Matrix Mobile Scan</b>\nSend any 10-digit number to scan.");
         break;
 
     case "/help":
-        sendMessage($chatId, "📖 <b>Help</b>\nSend a 10-digit number to get details.\nAdmin commands (reply to user message):\n/givecredit <UserID> <amount>\n/removecredit <UserID> <amount>\n/users\n/credit");
-        break;
-
-    case "/credit":
-        sendMessage($chatId, "💳 You have <b>{$credits[$userId]}</b> credits remaining.");
+        sendMessage($chatId, "📖 <b>Help</b>\nSend a 10-digit number to get details.\nAdmin commands:\n/givecredit <UserID> <amount>\n/removecredit <UserID> <amount>\n/users");
         break;
 
     case "/users":
         if ($userId != $adminID) { sendMessage($chatId, "🚫 Admin only."); exit; }
         $msg = "👥 <b>Registered Users</b>\n\n";
-        $buttons = [];
         foreach ($users as $uid => $u) {
             $msg .= "🆔 <b>ID:</b> <code>$uid</code>\n";
             $msg .= "👤 <b>Username:</b> @" . $u['username'] . "\n";
-            $msg .= "💳 <b>Credits:</b> " . $u['credits'] . "\n";
             $msg .= "────────────────────\n";
-            $buttons[] = [["text"=>"Copy ID $uid","switch_inline_query_current_chat"=>$uid]];
         }
-        sendMessage($chatId, $msg, $buttons);
+        sendMessage($chatId, $msg);
         break;
 
     default:
@@ -109,7 +102,9 @@ switch ($text) {
             }
 
             foreach ($data['result'] as $person) {
-                $formatted = "🛰️ <b>Mobile Scan Report</b> 🛰️\n\n";
+                $formatted = "🟢━━━━━━━━━━━━━━🟢\n";
+                $formatted .= "💾 <b>DIGITAL MATRIX REPORT</b> 💾\n";
+                $formatted .= "🟢━━━━━━━━━━━━━━🟢\n\n";
                 $formatted .= "📱 <b>Mobile:</b> <code>$text</code>\n";
                 $formatted .= "📞 <b>Alt Mobile:</b> <code>" . htmlspecialchars($person['alt_mobile']) . "</code>\n";
                 $formatted .= "🖊 <b>Name:</b> " . htmlspecialchars($person['name']) . "\n";
@@ -119,15 +114,7 @@ switch ($text) {
                 $formatted .= "📧 <b>Email:</b> <code>" . htmlspecialchars($person['email']) . "</code>\n";
                 $formatted .= "📡 <b>Circle:</b> " . htmlspecialchars($person['circle']) . "\n";
 
-                $buttons = [[
-                    ["text"=>"Copy Mobile","switch_inline_query_current_chat"=>$text],
-                    ["text"=>"Copy Alt Mobile","switch_inline_query_current_chat"=>$person['alt_mobile']],
-                    ["text"=>"Copy ID","switch_inline_query_current_chat"=>$person['id_number']],
-                    ["text"=>"Copy Address","switch_inline_query_current_chat"=>$person['address']],
-                    ["text"=>"Copy Email","switch_inline_query_current_chat"=>$person['email']]
-                ]];
-
-                sendMessage($chatId, $formatted, $buttons);
+                sendMessage($chatId, $formatted);
             }
 
         } else {
@@ -144,10 +131,9 @@ function saveData() {
 }
 
 // Send message
-function sendMessage($chatId, $msg, $buttons = null) {
+function sendMessage($chatId, $msg) {
     global $apiURL;
     $data = ["chat_id" => $chatId, "text" => $msg, "parse_mode" => "HTML"];
-    if ($buttons) $data["reply_markup"] = json_encode(["inline_keyboard"=>$buttons]);
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $apiURL."sendMessage");
     curl_setopt($ch, CURLOPT_POST, true);
