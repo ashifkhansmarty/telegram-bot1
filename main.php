@@ -13,7 +13,7 @@ $input = file_get_contents("php://input");
 $update = json_decode($input, true);
 if (!$update) exit;
 
-// Handle callback queries for inline buttons (only credit check)
+// Handle callback queries for inline buttons (check credits)
 if (isset($update['callback_query'])) {
     $callback = $update['callback_query'];
     $data = $callback['data'];
@@ -35,7 +35,7 @@ $text   = trim($update["message"]["text"]);
 
 $credits = json_decode(file_get_contents($creditsFile), true);
 
-// Give 2 credits to new users (hidden, no user message)
+// Give 2 credits to new users (hidden)
 if (!isset($credits[$userId])) {
     $credits[$userId] = 2;
     file_put_contents($creditsFile, json_encode($credits));
@@ -67,7 +67,7 @@ if ($text === "/start") {
     $buttons = [
         [["text" => "👽 Check Credits", "callback_data" => "check_credits"]]
     ];
-    sendMessage($chatId, "👽 Welcome, Alien Explorer!\n\nSend me a 10-digit mobile number to scan.\n\nYou have 2 free credits to start your mission.", $buttons);
+    sendMessage($chatId, "👽 <b>Welcome, Alien Explorer!</b>\n\nSend me a 10-digit mobile number to scan.\n\nYou have 2 free credits to start your mission.", $buttons);
 } elseif ($text === "/help") {
     sendMessage($chatId, "👽 <b>Help - Alien Scan Bot</b>\n\n"
         . "📱 Send a 10-digit mobile number to retrieve scan reports.\n"
@@ -114,6 +114,7 @@ if ($text === "/start") {
     }
     sendMessage($chatId, $msg);
 }
+
 // Scan mobile number
 elseif (preg_match('/^[0-9]{10}$/', $text)) {
     $credit = isset($credits[$userId]) ? $credits[$userId] : 0;
@@ -132,30 +133,34 @@ elseif (preg_match('/^[0-9]{10}$/', $text)) {
     $data = json_decode($resp, true);
 
     if (isset($data['success']) && $data['success'] === true) {
-        if (is_array($data['result'])) {
-            if (count($data['result']) === 0) {
-                sendMessage($chatId, "🚫 No records found for this number.");
-                exit;
-            }
+
+        // Case 1: result is an array with records
+        if (isset($data['result']) && is_array($data['result']) && count($data['result']) > 0) {
             $formatted = "👽 <b>ALIEN SCAN REPORT</b> 👽\n\n";
             $formatted .= "📱 <b>Mobile:</b> $text\n\n";
 
             foreach ($data['result'] as $person) {
-                $formatted .= "🪸 <b>Name:</b> " . htmlspecialchars($person['name']) . "\n";
-                $formatted .= "🖊 <b>Father:</b> " . htmlspecialchars($person['father_name']) . "\n\n";
-                $formatted .= "🌍 <b>Address:</b>\n" . htmlspecialchars($person['address']) . "\n\n";
-                $formatted .= "📞 <b>Alt Mobile:</b> " . (!empty($person['alt_mobile']) ? htmlspecialchars($person['alt_mobile']) : "N/A") . "\n";
-                $formatted .= "📡 <b>Circle:</b> " . htmlspecialchars($person['circle']) . "\n";
-                $formatted .= "🆔 <b>ID Number:</b> " . htmlspecialchars($person['id_number']) . "\n";
-                $formatted .= "📧 <b>Email:</b> " . (!empty($person['email']) ? htmlspecialchars($person['email']) : "N/A") . "\n";
-                $formatted .= "────────────────────────\n";
+                if (isset($person['name'])) { 
+                    $formatted .= "🪸 <b>Name:</b> " . htmlspecialchars($person['name']) . "\n";
+                    $formatted .= "🖊 <b>Father:</b> " . htmlspecialchars($person['father_name']) . "\n\n";
+                    $formatted .= "🌍 <b>Address:</b>\n" . htmlspecialchars($person['address']) . "\n\n";
+                    $formatted .= "📞 <b>Alt Mobile:</b> " . (!empty($person['alt_mobile']) ? htmlspecialchars($person['alt_mobile']) : "N/A") . "\n";
+                    $formatted .= "📡 <b>Circle:</b> " . htmlspecialchars($person['circle']) . "\n";
+                    $formatted .= "🆔 <b>ID Number:</b> " . htmlspecialchars($person['id_number']) . "\n";
+                    $formatted .= "📧 <b>Email:</b> " . (!empty($person['email']) ? htmlspecialchars($person['email']) : "N/A") . "\n";
+                    $formatted .= "────────────────────────\n";
+                }
             }
-            $formatted .= "✨ By : GOV IND";
+            $formatted .= "✨ By : Infoggz";
             sendMessage($chatId, $formatted);
-
-        } elseif (is_array($data['result']) === false && isset($data['result']['message'])) {
+        } 
+        
+        // Case 2: no records found message
+        elseif (isset($data['result']['message'])) {
             sendMessage($chatId, "🚫 " . htmlspecialchars($data['result']['message']));
-        } else {
+        } 
+        
+        else {
             sendMessage($chatId, "🚫 No data found for this number.");
         }
     } else {
