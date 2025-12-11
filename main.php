@@ -1,15 +1,13 @@
 <?php
 
-// Telegram bot token
 $botToken = "7639044509:AAH8-Uh024ffsU6E2jq9kVi2QFwJfPAARrI";
 $apiURL   = "https://api.telegram.org/bot$botToken/";
 
-// Read POST body from Telegram (Render fully supports php://input)
+// Read Telegram update
 $input = file_get_contents("php://input");
 $update = json_decode($input, true);
 
-// If no update received
-if(!$update) {
+if (!$update) {
     echo "No update received";
     exit;
 }
@@ -17,26 +15,23 @@ if(!$update) {
 $chatId = $update["message"]["chat"]["id"];
 $text   = trim($update["message"]["text"]);
 
-// 10-digit number check
 if (preg_match('/^[0-9]{10}$/', $text)) {
 
-    // Call your API
-    $apiUrl = "https://mynkapi.amit1100941.workers.dev/api?key=mynk01&type=mobile&term=$text";
+    $url = "https://mynkapi.amit1100941.workers.dev/api?key=mynk01&type=mobile&term=$text";
 
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $apiUrl);
+    curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    $apiResponse = curl_exec($ch);
+    $resp = curl_exec($ch);
     curl_close($ch);
 
-    sendMessage($chatId, $apiResponse);
+    sendMessage($chatId, $resp);
 
 } else {
     sendMessage($chatId, "Send a valid 10-digit mobile number.");
 }
 
-// Send message to Telegram
-function sendMessage($chatId, $msg)
+function sendMessage($chatId, $message)
 {
     global $apiURL;
 
@@ -45,7 +40,7 @@ function sendMessage($chatId, $msg)
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, [
         "chat_id" => $chatId,
-        "text" => $msg
+        "text" => $message
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_exec($ch);
