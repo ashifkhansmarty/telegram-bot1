@@ -33,10 +33,9 @@ $users[$userId] = [
 
 saveData();
 
-// Admin credit management via reply
-if (isset($update["message"]["reply_to_message"]) && ($userId == $adminID)) {
+// Admin credit management
+if ($userId == $adminID && isset($update["message"]["reply_to_message"])) {
     $replyUserId = $update["message"]["reply_to_message"]["from"]["id"];
-
     if (preg_match('/^\/give (\d+)$/', $text, $matches)) {
         $amt = intval($matches[1]);
         $credits[$replyUserId] = (isset($credits[$replyUserId]) ? $credits[$replyUserId] : 0) + $amt;
@@ -45,7 +44,6 @@ if (isset($update["message"]["reply_to_message"]) && ($userId == $adminID)) {
         sendMessage($chatId, "✅ Added <b>$amt credits</b> to <code>$replyUserId</code>");
         exit;
     }
-
     if (preg_match('/^\/remove (\d+)$/', $text, $matches)) {
         $amt = intval($matches[1]);
         $credits[$replyUserId] = max(0, (isset($credits[$replyUserId]) ? $credits[$replyUserId] : 0) - $amt);
@@ -59,18 +57,11 @@ if (isset($update["message"]["reply_to_message"]) && ($userId == $adminID)) {
 // Commands
 switch ($text) {
     case "/start":
-        sendMessage($chatId, "🚀 <b>Welcome to Mobile Info Bot!</b>\n\n"
-            . "Send any 10-digit number to scan.\n"
-            . "💳 Credits: <b>{$credits[$userId]}</b>");
+        sendMessage($chatId, "🚀 <b>Welcome to Mobile Info Bot!</b>\n\nSend any 10-digit number to scan.\n💳 Credits: <b>{$credits[$userId]}</b>");
         break;
 
     case "/help":
-        sendMessage($chatId, "📖 <b>Help - Mobile Info Bot</b>\n\n"
-            . "Send a 10-digit number to retrieve details.\n"
-            . "Admin Commands:\n"
-            . " - Reply with /give <amount> or /remove <amount> to manage credits.\n"
-            . " - /users : List all users.\n"
-            . " - /credit : Check your credits.");
+        sendMessage($chatId, "📖 <b>Help - Mobile Info Bot</b>\n\nSend a 10-digit number to retrieve details.\nAdmin Commands (reply to user message):\n/give <amount> - Add credits\n/remove <amount> - Remove credits\n/users - List users\n/credit - Check your credits");
         break;
 
     case "/credit":
@@ -108,15 +99,12 @@ switch ($text) {
             $data = json_decode($resp, true);
 
             if (isset($data['success']) && $data['success'] === true) {
-
-                // If no results
                 if (isset($data['result']['message'])) {
                     sendMessage($chatId, "⚠️ <b>No data found!</b>\nPlease check the number or contact admin @$adminContact.");
                 } else {
-                    $formatted = "🚀 <b>📊 Mobile Scan Report</b> 🚀\n\n";
-                    $formatted .= "📱 <b>Mobile:</b> <code>$text</code>\n\n";
-
                     foreach ($data['result'] as $person) {
+                        $formatted = "🚀 <b>📊 Mobile Scan Report</b> 🚀\n\n";
+                        $formatted .= "📱 <b>Mobile:</b> <code>$text</code>\n";
                         $formatted .= "👤 <b>Name:</b> " . htmlspecialchars($person['name']) . "\n";
                         $formatted .= "🖊 <b>Father:</b> " . htmlspecialchars($person['father_name']) . "\n";
                         $formatted .= "🌍 <b>Address:</b> " . htmlspecialchars($person['address']) . "\n";
@@ -124,20 +112,15 @@ switch ($text) {
                         $formatted .= "📡 <b>Circle:</b> " . htmlspecialchars($person['circle']) . "\n";
                         $formatted .= "🆔 <b>ID Number:</b> <code>" . htmlspecialchars($person['id_number']) . "</code>\n";
                         $formatted .= "📧 <b>Email:</b> " . (!empty($person['email']) ? htmlspecialchars($person['email']) : "N/A") . "\n";
-                        $formatted .= "────────────────────────\n";
 
-                        // Inline buttons for copy
-                        $buttons = [
-                            [
-                                ["text"=>"Copy Mobile","switch_inline_query_current_chat"=>$text],
-                                ["text"=>"Copy Alt Mobile","switch_inline_query_current_chat"=>$person['alt_mobile']]
-                            ],
-                            [
-                                ["text"=>"Copy ID","switch_inline_query_current_chat"=>$person['id_number']],
-                                ["text"=>"Copy Address","switch_inline_query_current_chat"=>$person['address']],
-                                ["text"=>"Copy Email","switch_inline_query_current_chat"=>$person['email']]
-                            ]
-                        ];
+                        // Single set of inline buttons for one-click copy
+                        $buttons = [[
+                            ["text"=>"Copy Mobile","switch_inline_query_current_chat"=>$text],
+                            ["text"=>"Copy Alt Mobile","switch_inline_query_current_chat"=>$person['alt_mobile']],
+                            ["text"=>"Copy ID","switch_inline_query_current_chat"=>$person['id_number']],
+                            ["text"=>"Copy Address","switch_inline_query_current_chat"=>$person['address']],
+                            ["text"=>"Copy Email","switch_inline_query_current_chat"=>$person['email']]
+                        ]];
 
                         sendMessage($chatId, $formatted, $buttons);
                     }
