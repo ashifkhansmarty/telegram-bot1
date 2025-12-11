@@ -5,7 +5,7 @@ $apiURL   = "https://api.telegram.org/bot$botToken/";
 $adminID  = 1229178839;
 $adminContact = "infoggz";
 
-// Files to store credits and user info
+// Files to store persistent data
 $creditsFile = 'credits.json';
 $usersFile   = 'users.json';
 
@@ -23,20 +23,19 @@ $chatId = $update["message"]["chat"]["id"];
 $userId = $update["message"]["from"]["id"];
 $text   = trim($update["message"]["text"]);
 
-// Give 2 credits only if user is new
+// Give 2 credits if user is new
 if (!isset($credits[$userId])) {
     $credits[$userId] = 2;
 }
 
-// Store/update username (preserve existing credits)
+// Store/update username (preserve credits)
 $users[$userId] = [
     "username" => isset($update["message"]["from"]["username"]) ? $update["message"]["from"]["username"] : "N/A",
     "credits" => $credits[$userId]
 ];
 
 // Save data
-file_put_contents($creditsFile, json_encode($credits));
-file_put_contents($usersFile, json_encode($users));
+saveData();
 
 // Admin reply commands to give/remove credits
 if (isset($update["message"]["reply_to_message"]) && ($userId == $adminID)) {
@@ -47,7 +46,7 @@ if (isset($update["message"]["reply_to_message"]) && ($userId == $adminID)) {
         $credits[$replyUserId] = (isset($credits[$replyUserId]) ? $credits[$replyUserId] : 0) + $amt;
         $users[$replyUserId]['credits'] = $credits[$replyUserId];
         saveData();
-        sendMessage($chatId, "🛸 Added $amt credits to user $replyUserId");
+        sendMessage($chatId, "🛸 Added $amt credits to user <code>$replyUserId</code>");
         exit;
     }
 
@@ -56,14 +55,14 @@ if (isset($update["message"]["reply_to_message"]) && ($userId == $adminID)) {
         $credits[$replyUserId] = max(0, (isset($credits[$replyUserId]) ? $credits[$replyUserId] : 0) - $amt);
         $users[$replyUserId]['credits'] = $credits[$replyUserId];
         saveData();
-        sendMessage($chatId, "🛸 Removed $amt credits from user $replyUserId");
+        sendMessage($chatId, "🛸 Removed $amt credits from user <code>$replyUserId</code>");
         exit;
     }
 }
 
 // Commands
 if ($text === "/start") {
-    sendMessage($chatId, "👽 <b>Welcome, Alien Explorer!</b>\n\nSend a 10-digit mobile number to scan.\n\nYou have <b>{$credits[$userId]}</b> credits.", null);
+    sendMessage($chatId, "👽 <b>Welcome, Alien Explorer!</b>\n\nSend a 10-digit mobile number to scan.\n\nYou have <b>{$credits[$userId]}</b> credits.");
 } elseif ($text === "/help") {
     sendMessage($chatId, "👽 <b>Help - Alien Scan Bot</b>\n\n"
         . "📱 Send a 10-digit mobile number to retrieve scan reports.\n"
@@ -81,7 +80,7 @@ if ($text === "/start") {
     $credits[$uid] = (isset($credits[$uid]) ? $credits[$uid] : 0) + $amt;
     $users[$uid]['credits'] = $credits[$uid];
     saveData();
-    sendMessage($chatId, "🛸 Added $amt credits to user $uid");
+    sendMessage($chatId, "🛸 Added $amt credits to user <code>$uid</code>");
 } elseif (preg_match('/^\/removecredit (\d+) (\d+)$/', $text, $matches)) {
     if ($userId != $adminID) { sendMessage($chatId, "🚫 Only admin can remove credits."); exit; }
     $uid = intval($matches[1]);
@@ -89,13 +88,13 @@ if ($text === "/start") {
     $credits[$uid] = max(0, (isset($credits[$uid]) ? $credits[$uid] : 0) - $amt);
     $users[$uid]['credits'] = $credits[$uid];
     saveData();
-    sendMessage($chatId, "🛸 Removed $amt credits from user $uid");
+    sendMessage($chatId, "🛸 Removed $amt credits from user <code>$uid</code>");
 } elseif ($text === "/users") {
     if ($userId != $adminID) { sendMessage($chatId, "🚫 Only admin can see users."); exit; }
     if (empty($users)) { sendMessage($chatId, "👽 No users found."); exit; }
     $msg = "👽 <b>Users & Credits</b>:\n\n";
     foreach ($users as $uid => $uinfo) {
-        $msg .= "👤 <b>User ID:</b> $uid | <b>Username:</b> @" . $uinfo['username'] . " | <b>Credits:</b> " . $uinfo['credits'] . "\n";
+        $msg .= "👤 <b>User ID:</b> <code>$uid</code> | <b>Username:</b> @" . $uinfo['username'] . " | <b>Credits:</b> " . $uinfo['credits'] . "\n";
     }
     sendMessage($chatId, $msg);
 }
