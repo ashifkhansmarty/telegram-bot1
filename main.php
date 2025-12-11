@@ -27,13 +27,13 @@ if (!isset($credits[$userId])) $credits[$userId] = 2;
 
 // Track users
 $users[$userId] = [
-    "username" => isset($update["message"]["from"]["username"]) ? $update["message"]["from"]["username"] : "N/A",
+    "username" => $update["message"]["from"]["username"] ?? "N/A",
     "credits" => $credits[$userId]
 ];
 
 saveData();
 
-// Admin credit commands: /givecredit or /removecredit
+// Admin credit commands
 if ($userId == $adminID) {
     if (preg_match('/^\/givecredit (\d+) (\d+)$/', $text, $matches)) {
         $targetID = intval($matches[1]);
@@ -58,11 +58,11 @@ if ($userId == $adminID) {
 // Commands
 switch ($text) {
     case "/start":
-        sendMessage($chatId, "🚀 <b>Welcome to Mobile Info Bot</b>\n\nSend any 10-digit number to scan.\n💳 Credits: <b>{$credits[$userId]}</b>");
+        sendMessage($chatId, "🚀 <b>Welcome to Mobile Info Bot</b>\nSend any 10-digit number to scan.\n💳 Credits: <b>{$credits[$userId]}</b>");
         break;
 
     case "/help":
-        sendMessage($chatId, "📖 <b>Help</b>\n\nSend a 10-digit number to get details.\nAdmin commands:\n/givecredit <UserID> <amount>\n/removecredit <UserID> <amount>\n/users\n/credit");
+        sendMessage($chatId, "📖 <b>Help</b>\nSend a 10-digit number to get details.\nAdmin commands (reply to user message):\n/givecredit <UserID> <amount>\n/removecredit <UserID> <amount>\n/users\n/credit");
         break;
 
     case "/credit":
@@ -108,17 +108,16 @@ switch ($text) {
                 exit;
             }
 
-            // Modern theme: single card with copy buttons
             foreach ($data['result'] as $person) {
-                $formatted = "🛸 <b>Alien Scan Report</b> 🛸\n\n";
+                $formatted = "🛰️ <b>Mobile Scan Report</b> 🛰️\n\n";
                 $formatted .= "📱 <b>Mobile:</b> <code>$text</code>\n";
-                $formatted .= "👤 <b>Name:</b> " . htmlspecialchars($person['name']) . "\n";
-                $formatted .= "🖊 <b>Father:</b> " . htmlspecialchars($person['father_name']) . "\n";
-                $formatted .= "🌍 <b>Address:</b> " . htmlspecialchars($person['address']) . "\n";
-                $formatted .= "📞 <b>Alt Mobile:</b> " . htmlspecialchars($person['alt_mobile']) . "\n";
+                $formatted .= "📞 <b>Alt Mobile:</b> <code>" . htmlspecialchars($person['alt_mobile']) . "</code>\n";
+                $formatted .= "🖊 <b>Name:</b> " . htmlspecialchars($person['name']) . "\n";
+                $formatted .= "👤 <b>Father:</b> " . htmlspecialchars($person['father_name']) . "\n";
+                $formatted .= "🌍 <b>Address:</b> <code>" . htmlspecialchars($person['address']) . "</code>\n";
+                $formatted .= "🆔 <b>ID Number:</b> <code>" . htmlspecialchars($person['id_number']) . "</code>\n";
+                $formatted .= "📧 <b>Email:</b> <code>" . htmlspecialchars($person['email']) . "</code>\n";
                 $formatted .= "📡 <b>Circle:</b> " . htmlspecialchars($person['circle']) . "\n";
-                $formatted .= "🆔 <b>ID Number:</b> " . htmlspecialchars($person['id_number']) . "\n";
-                $formatted .= "📧 <b>Email:</b> " . htmlspecialchars($person['email']) . "\n";
 
                 $buttons = [[
                     ["text"=>"Copy Mobile","switch_inline_query_current_chat"=>$text],
@@ -144,7 +143,7 @@ function saveData() {
     file_put_contents($usersFile, json_encode($users));
 }
 
-// Send Telegram message
+// Send message
 function sendMessage($chatId, $msg, $buttons = null) {
     global $apiURL;
     $data = ["chat_id" => $chatId, "text" => $msg, "parse_mode" => "HTML"];
