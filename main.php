@@ -5,50 +5,49 @@ $apiURL   = "https://api.telegram.org/bot$botToken/";
 $adminID  = 1229178839; // Admin ID
 $adminContact = "infoggz";
 
+// Files to store credits and user info
 $creditsFile = 'credits.json';
-if (!file_exists($creditsFile)) file_put_contents($creditsFile, json_encode([]));
+$usersFile   = 'users.json';
 
-// Read update
+// Load existing data or initialize empty arrays
+$credits = file_exists($creditsFile) ? json_decode(file_get_contents($creditsFile), true) : [];
+$users   = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
+
+// Read incoming update
 $input = file_get_contents("php://input");
 $update = json_decode($input, true);
 if (!$update) exit;
-
-// Handle callback queries for inline buttons (check credits)
-if (isset($update['callback_query'])) {
-    $callback = $update['callback_query'];
-    $data = $callback['data'];
-    $fromId = $callback['from']['id'];
-    $chatIdCb = $callback['message']['chat']['id'];
-
-    $credits = json_decode(file_get_contents($creditsFile), true);
-    if ($data === "check_credits") {
-        $credit = isset($credits[$fromId]) ? $credits[$fromId] : 0;
-        sendMessage($chatIdCb, "👽 Your current credits: $credit");
-    }
-    exit;
-}
 
 // Message variables
 $chatId = $update["message"]["chat"]["id"];
 $userId = $update["message"]["from"]["id"];
 $text   = trim($update["message"]["text"]);
 
-$credits = json_decode(file_get_contents($creditsFile), true);
-
-// Give 2 credits to new users (hidden)
+// Give 2 credits only if user is truly new
 if (!isset($credits[$userId])) {
     $credits[$userId] = 2;
-    file_put_contents($creditsFile, json_encode($credits));
 }
 
-// Admin reply-to message for giving/removing credits
+// Store/update username (preserve existing credits)
+$users[$userId] = [
+    "username" => isset($update["message"]["from"]["username"]) ? $update["message"]["from"]["username"] : "N/A",
+    "credits" => $credits[$userId]
+];
+
+// Save data
+file_put_contents($creditsFile, json_encode($credits));
+file_put_contents($usersFile, json_encode($users));
+
+// Admin reply commands to give/remove credits
 if (isset($update["message"]["reply_to_message"]) && ($userId == $adminID)) {
     $replyUserId = $update["message"]["reply_to_message"]["from"]["id"];
 
     if (preg_match('/^\/give (\d+)$/', $text, $matches)) {
         $amt = intval($matches[1]);
         $credits[$replyUserId] = (isset($credits[$replyUserId]) ? $credits[$replyUserId] : 0) + $amt;
+        $users[$replyUserId]['credits'] = $credits[$replyUserId];
         file_put_contents($creditsFile, json_encode($credits));
+        file_put_contents($usersFile, json_encode($users));
         sendMessage($chatId, "🛸 Added $amt credits to user $replyUserId");
         exit;
     }
@@ -56,7 +55,9 @@ if (isset($update["message"]["reply_to_message"]) && ($userId == $adminID)) {
     if (preg_match('/^\/remove (\d+)$/', $text, $matches)) {
         $amt = intval($matches[1]);
         $credits[$replyUserId] = max(0, (isset($credits[$replyUserId]) ? $credits[$replyUserId] : 0) - $amt);
+        $users[$replyUserId]['credits'] = $credits[$replyUserId];
         file_put_contents($creditsFile, json_encode($credits));
+        file_put_contents($usersFile, json_encode($users));
         sendMessage($chatId, "🛸 Removed $amt credits from user $replyUserId");
         exit;
     }
@@ -67,15 +68,15 @@ if ($text === "/start") {
     $buttons = [
         [["text" => "👽 Check Credits", "callback_data" => "check_credits"]]
     ];
-    sendMessage($chatId, "👽 <b>Welcome, Alien Explorer!</b>\n\nSend me a 10-digit mobile number to scan.\n\nYou have 2 free credits to start your mission.", $buttons);
+    sendMessage($chatId, "👽 <b>Welcome, Alien Explorer!</b>\n\nSend me a 10-digit mobile number to scan.\n\nYou have " . $credits[$userId] . " credits to start your mission.", $buttons);
 } elseif ($text === "/help") {
     sendMessage($chatId, "👽 <b>Help - Alien Scan Bot</b>\n\n"
         . "📱 Send a 10-digit mobile number to retrieve scan reports.\n"
         . "⚡ Admin Commands:\n"
-        . " - /givecredit &lt;user_id&gt; &lt;amount&gt;  (Add credits)\n"
-        . " - /removecredit &lt;user_id&gt; &lt;amount&gt; (Remove credits)\n"
+        . " - /givecredit <user_id> <amount>  (Add credits)\n"
+        . " - /removecredit <user_id> <amount> (Remove credits)\n"
         . " - /users (List users and credits)\n"
-        . "🛸 Reply to a user message with /give &lt;amount&gt; or /remove &lt;amount&gt; to modify credits.");
+        . "🛸 Reply to a user message with /give <amount> or /remove <amount> to modify credits.");
 } elseif ($text === "/credit") {
     $credit = isset($credits[$userId]) ? $credits[$userId] : 0;
     sendMessage($chatId, "👽 You have <b>$credit</b> credits remaining.");
@@ -87,7 +88,9 @@ if ($text === "/start") {
     $uid = intval($matches[1]);
     $amt = intval($matches[2]);
     $credits[$uid] = (isset($credits[$uid]) ? $credits[$uid] : 0) + $amt;
+    $users[$uid]['credits'] = $credits[$uid];
     file_put_contents($creditsFile, json_encode($credits));
+    file_put_contents($usersFile, json_encode($users));
     sendMessage($chatId, "🛸 Added $amt credits to user $uid");
 } elseif (preg_match('/^\/removecredit (\d+) (\d+)$/', $text, $matches)) {
     if ($userId != $adminID) {
@@ -97,27 +100,31 @@ if ($text === "/start") {
     $uid = intval($matches[1]);
     $amt = intval($matches[2]);
     $credits[$uid] = max(0, (isset($credits[$uid]) ? $credits[$uid] : 0) - $amt);
+    $users[$uid]['credits'] = $credits[$uid];
     file_put_contents($creditsFile, json_encode($credits));
+    file_put_contents($usersFile, json_encode($users));
     sendMessage($chatId, "🛸 Removed $amt credits from user $uid");
 } elseif ($text === "/users") {
     if ($userId != $adminID) {
         sendMessage($chatId, "🚫 Only admin can see users.");
         exit;
     }
-    if (empty($credits)) {
+
+    if (empty($users)) {
         sendMessage($chatId, "👽 No users found.");
         exit;
     }
+
     $msg = "👽 <b>Users & Credits</b>:\n\n";
-    foreach ($credits as $uid => $credit) {
-        $msg .= "👤 <b>User ID:</b> $uid | <b>Credits:</b> $credit\n";
+    foreach ($users as $uid => $uinfo) {
+        $msg .= "👤 <b>User ID:</b> $uid | <b>Username:</b> @" . $uinfo['username'] . " | <b>Credits:</b> " . $uinfo['credits'] . "\n";
     }
     sendMessage($chatId, $msg);
 }
 
 // Scan mobile number
 elseif (preg_match('/^[0-9]{10}$/', $text)) {
-    $credit = isset($credits[$userId]) ? $credits[$userId] : 0;
+    $credit = $credits[$userId];
     if ($credit < 1) {
         sendMessage($chatId, "❌ You have 0 credits left.\nPlease contact Admin @$adminContact to refill your credits.");
         exit;
@@ -125,7 +132,9 @@ elseif (preg_match('/^[0-9]{10}$/', $text)) {
 
     // Deduct 1 credit silently
     $credits[$userId] -= 1;
+    $users[$userId]['credits'] = $credits[$userId];
     file_put_contents($creditsFile, json_encode($credits));
+    file_put_contents($usersFile, json_encode($users));
 
     // Call external API
     $url = "https://mynkapi.amit1100941.workers.dev/api?key=mynk01&type=mobile&term=$text";
@@ -133,8 +142,6 @@ elseif (preg_match('/^[0-9]{10}$/', $text)) {
     $data = json_decode($resp, true);
 
     if (isset($data['success']) && $data['success'] === true) {
-
-        // Case 1: result is an array with records
         if (isset($data['result']) && is_array($data['result']) && count($data['result']) > 0) {
             $formatted = "👽 <b>ALIEN SCAN REPORT</b> 👽\n\n";
             $formatted .= "📱 <b>Mobile:</b> $text\n\n";
@@ -151,16 +158,11 @@ elseif (preg_match('/^[0-9]{10}$/', $text)) {
                     $formatted .= "────────────────────────\n";
                 }
             }
-            $formatted .= "✨ By : Infoggz";
+            $formatted .= "✨ By : GOV IND";
             sendMessage($chatId, $formatted);
-        } 
-        
-        // Case 2: no records found message
-        elseif (isset($data['result']['message'])) {
+        } elseif (isset($data['result']['message'])) {
             sendMessage($chatId, "🚫 " . htmlspecialchars($data['result']['message']));
-        } 
-        
-        else {
+        } else {
             sendMessage($chatId, "🚫 No data found for this number.");
         }
     } else {
@@ -170,6 +172,7 @@ elseif (preg_match('/^[0-9]{10}$/', $text)) {
     sendMessage($chatId, "👽 <b>Invalid input!</b>\nPlease send a valid 10-digit mobile number.");
 }
 
+// Send message function
 function sendMessage($chatId, $msg, $buttons = null)
 {
     global $apiURL;
@@ -194,5 +197,4 @@ function sendMessage($chatId, $msg, $buttons = null)
     curl_exec($ch);
     curl_close($ch);
 }
-
 ?>
