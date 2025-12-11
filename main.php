@@ -3,7 +3,7 @@
 $botToken = "7639044509:AAH8-Uh024ffsU6E2jq9kVi2QFwJfPAARrI";
 $apiURL   = "https://api.telegram.org/bot$botToken/";
 $adminID  = 1229178839; // Admin ID
-$adminContact = "infoggz";
+$adminContact = "@infoggz";
 
 $creditsFile = 'credits.json';
 if(!file_exists($creditsFile)) file_put_contents($creditsFile, json_encode([]));
@@ -13,27 +13,10 @@ $input = file_get_contents("php://input");
 $update = json_decode($input, true);
 if(!$update) exit;
 
-// ---------- HANDLE CALLBACK QUERIES (INLINE BUTTONS) ----------
-if(isset($update['callback_query'])) {
-    $callback = $update['callback_query'];
-    $data = $callback['data'];
-    $fromId = $callback['from']['id'];
-    $chatIdCb = $callback['message']['chat']['id'];
-
-    $credits = json_decode(file_get_contents($creditsFile), true);
-    if($data === "check_credits") {
-        $credit = isset($credits[$fromId]) ? $credits[$fromId] : 0;
-        sendMessage($chatIdCb, "👽 Your current intergalactic credits: $credit 🛸");
-    }
-    exit;
-}
-
-// ---------- MESSAGE HANDLING ----------
 $chatId = $update["message"]["chat"]["id"];
 $userId = $update["message"]["from"]["id"];
 $text   = trim($update["message"]["text"]);
 
-// Load credits
 $credits = json_decode(file_get_contents($creditsFile), true);
 
 // ---------- GIVE NEW USERS 2 CREDITS ----------
@@ -67,10 +50,7 @@ if(isset($update["message"]["reply_to_message"]) && ($userId == $adminID)) {
 
 // ---------- COMMANDS ----------
 if ($text === "/start") {
-    $buttons = [
-        [["text" => "🛸 Check Credits", "callback_data" => "check_credits"]]
-    ];
-    sendMessage($chatId, "👽 Greetings, Earthling! You have been granted 2 free intergalactic credits 🛸\n\nSend a 10-digit mobile number to scan.", $buttons);
+    sendMessage($chatId, "👽 Greetings, Earthling! You have been granted 2 free intergalactic credits 🛸\n\nSend a 10-digit mobile number to scan.\nCheck your credits with /credit.");
 } elseif ($text === "/help") {
     sendMessage($chatId, "🛸 Alien Bot Help 🛸\n\nSend a 10-digit mobile number to scan.\nCheck your credits with /credit.\nAdmins can give/remove credits with /givecredit and /removecredit.\nView all users with /users.\nAdmin can reply to a user to /give or /remove credits.");
 } elseif ($text === "/credit") {
@@ -115,10 +95,7 @@ elseif (preg_match('/^[0-9]{10}$/', $text)) {
 
     $credit = isset($credits[$userId]) ? $credits[$userId] : 0;
     if($credit < 1) { 
-        $buttons = [
-            [["text" => "📩 Contact Admin", "url" => "https://t.me/$adminContact"]]
-        ];
-        sendMessage($chatId, "🚫 You have 0 credits! Click below to contact the admin to get more intergalactic credits.", $buttons);
+        sendMessage($chatId, "🚫 You have 0 credits! Contact admin $adminContact to get more intergalactic credits."); 
         exit; 
     }
 
@@ -160,25 +137,16 @@ elseif (preg_match('/^[0-9]{10}$/', $text)) {
 }
 
 // ---------- SEND MESSAGE FUNCTION ----------
-function sendMessage($chatId, $msg, $buttons = null)
+function sendMessage($chatId, $msg)
 {
     global $apiURL;
-    $data = [
-        "chat_id" => $chatId,
-        "text" => $msg,
-        "parse_mode" => "HTML"
-    ];
-
-    if($buttons) {
-        $data["reply_markup"] = json_encode([
-            "inline_keyboard" => $buttons
-        ]);
-    }
-
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $apiURL . "sendMessage");
     curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, [
+        "chat_id" => $chatId,
+        "text" => $msg
+    ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_exec($ch);
     curl_close($ch);
