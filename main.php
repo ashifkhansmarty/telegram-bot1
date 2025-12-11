@@ -131,7 +131,7 @@ elseif (preg_match('/^[0-9]{10}$/', $text)) {
                 $formatted .= "📧 <b>Email:</b> " . (!empty($person['email']) ? htmlspecialchars($person['email']) : "N/A") . "\n";
                 $formatted .= "────────────────────────\n";
             }
-            $formatted .= "✨ By : GOV IND";
+            $formatted .= "✨ By : Infoggz";
             sendMessage($chatId, $formatted);
         } else {
             sendMessage($chatId, "🚫 No data found for this number.");
