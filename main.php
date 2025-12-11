@@ -1,17 +1,17 @@
 <?php
 
 $botToken = "7639044509:AAH8-Uh024ffsU6E2jq9kVi2QFwJfPAARrI";
-$apiURL   = "https://api.telegram.org/bot$botToken/";
-$adminID  = 1229178839;
+$apiURL = "https://api.telegram.org/bot$botToken/";
+$adminID = 1229178839;
 $adminContact = "infoggz";
 
-// Persistent storage files
+// Storage files
 $creditsFile = 'credits.json';
-$usersFile   = 'users.json';
+$usersFile = 'users.json';
 
-// Load existing data
+// Load data
 $credits = file_exists($creditsFile) ? json_decode(file_get_contents($creditsFile), true) : [];
-$users   = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
+$users = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
 
 // Read incoming update
 $input = file_get_contents("php://input");
@@ -20,12 +20,12 @@ if (!$update) exit;
 
 $chatId = $update["message"]["chat"]["id"];
 $userId = $update["message"]["from"]["id"];
-$text   = trim($update["message"]["text"]);
+$text = trim($update["message"]["text"]);
 
 // Give 2 credits to new users
 if (!isset($credits[$userId])) $credits[$userId] = 2;
 
-// Track users without losing credits
+// Track users
 $users[$userId] = [
     "username" => isset($update["message"]["from"]["username"]) ? $update["message"]["from"]["username"] : "N/A",
     "credits" => $credits[$userId]
@@ -33,23 +33,24 @@ $users[$userId] = [
 
 saveData();
 
-// Admin credit management
-if ($userId == $adminID && isset($update["message"]["reply_to_message"])) {
-    $replyUserId = $update["message"]["reply_to_message"]["from"]["id"];
-    if (preg_match('/^\/give (\d+)$/', $text, $matches)) {
-        $amt = intval($matches[1]);
-        $credits[$replyUserId] = (isset($credits[$replyUserId]) ? $credits[$replyUserId] : 0) + $amt;
-        $users[$replyUserId]['credits'] = $credits[$replyUserId];
+// Admin credit commands: /givecredit or /removecredit
+if ($userId == $adminID) {
+    if (preg_match('/^\/givecredit (\d+) (\d+)$/', $text, $matches)) {
+        $targetID = intval($matches[1]);
+        $amount = intval($matches[2]);
+        $credits[$targetID] = ($credits[$targetID] ?? 0) + $amount;
+        $users[$targetID]['credits'] = $credits[$targetID];
         saveData();
-        sendMessage($chatId, "✅ Added <b>$amt credits</b> to <code>$replyUserId</code>");
+        sendMessage($chatId, "✅ Added <b>$amount credits</b> to <code>$targetID</code>");
         exit;
     }
-    if (preg_match('/^\/remove (\d+)$/', $text, $matches)) {
-        $amt = intval($matches[1]);
-        $credits[$replyUserId] = max(0, (isset($credits[$replyUserId]) ? $credits[$replyUserId] : 0) - $amt);
-        $users[$replyUserId]['credits'] = $credits[$replyUserId];
+    if (preg_match('/^\/removecredit (\d+) (\d+)$/', $text, $matches)) {
+        $targetID = intval($matches[1]);
+        $amount = intval($matches[2]);
+        $credits[$targetID] = max(0, ($credits[$targetID] ?? 0) - $amount);
+        $users[$targetID]['credits'] = $credits[$targetID];
         saveData();
-        sendMessage($chatId, "❌ Removed <b>$amt credits</b> from <code>$replyUserId</code>");
+        sendMessage($chatId, "❌ Removed <b>$amount credits</b> from <code>$targetID</code>");
         exit;
     }
 }
@@ -57,11 +58,11 @@ if ($userId == $adminID && isset($update["message"]["reply_to_message"])) {
 // Commands
 switch ($text) {
     case "/start":
-        sendMessage($chatId, "🚀 <b>Welcome to Mobile Info Bot!</b>\n\nSend any 10-digit number to scan.\n💳 Credits: <b>{$credits[$userId]}</b>");
+        sendMessage($chatId, "🚀 <b>Welcome to Mobile Info Bot</b>\n\nSend any 10-digit number to scan.\n💳 Credits: <b>{$credits[$userId]}</b>");
         break;
 
     case "/help":
-        sendMessage($chatId, "📖 <b>Help - Mobile Info Bot</b>\n\nSend a 10-digit number to retrieve details.\nAdmin Commands (reply to user message):\n/give <amount> - Add credits\n/remove <amount> - Remove credits\n/users - List users\n/credit - Check your credits");
+        sendMessage($chatId, "📖 <b>Help</b>\n\nSend a 10-digit number to get details.\nAdmin commands:\n/givecredit <UserID> <amount>\n/removecredit <UserID> <amount>\n/users\n/credit");
         break;
 
     case "/credit":
@@ -77,16 +78,15 @@ switch ($text) {
             $msg .= "👤 <b>Username:</b> @" . $u['username'] . "\n";
             $msg .= "💳 <b>Credits:</b> " . $u['credits'] . "\n";
             $msg .= "────────────────────\n";
-            $buttons[] = [["text"=>"Copy ID $uid","switch_inline_query_current_chat"=>"$uid"]];
+            $buttons[] = [["text"=>"Copy ID $uid","switch_inline_query_current_chat"=>$uid]];
         }
         sendMessage($chatId, $msg, $buttons);
         break;
 
     default:
         if (preg_match('/^[0-9]{10}$/', $text)) {
-
             if ($credits[$userId] < 1) {
-                sendMessage($chatId, "⚠️ You have 0 credits left.\nContact admin @$adminContact.");
+                sendMessage($chatId, "⚠️ You have 0 credits left. Contact admin @$adminContact.");
                 exit;
             }
 
@@ -98,45 +98,46 @@ switch ($text) {
             $resp = file_get_contents($url);
             $data = json_decode($resp, true);
 
-            if (isset($data['success']) && $data['success'] === true) {
-                if (isset($data['result']['message'])) {
-                    sendMessage($chatId, "⚠️ <b>No data found!</b>\nPlease check the number or contact admin @$adminContact.");
-                } else {
-                    foreach ($data['result'] as $person) {
-                        $formatted = "🚀 <b>📊 Mobile Scan Report</b> 🚀\n\n";
-                        $formatted .= "📱 <b>Mobile:</b> <code>$text</code>\n";
-                        $formatted .= "👤 <b>Name:</b> " . htmlspecialchars($person['name']) . "\n";
-                        $formatted .= "🖊 <b>Father:</b> " . htmlspecialchars($person['father_name']) . "\n";
-                        $formatted .= "🌍 <b>Address:</b> " . htmlspecialchars($person['address']) . "\n";
-                        $formatted .= "📞 <b>Alt Mobile:</b> " . (!empty($person['alt_mobile']) ? "<code>" . htmlspecialchars($person['alt_mobile']) . "</code>" : "N/A") . "\n";
-                        $formatted .= "📡 <b>Circle:</b> " . htmlspecialchars($person['circle']) . "\n";
-                        $formatted .= "🆔 <b>ID Number:</b> <code>" . htmlspecialchars($person['id_number']) . "</code>\n";
-                        $formatted .= "📧 <b>Email:</b> " . (!empty($person['email']) ? htmlspecialchars($person['email']) : "N/A") . "\n";
-
-                        // Single set of inline buttons for one-click copy
-                        $buttons = [[
-                            ["text"=>"Copy Mobile","switch_inline_query_current_chat"=>$text],
-                            ["text"=>"Copy Alt Mobile","switch_inline_query_current_chat"=>$person['alt_mobile']],
-                            ["text"=>"Copy ID","switch_inline_query_current_chat"=>$person['id_number']],
-                            ["text"=>"Copy Address","switch_inline_query_current_chat"=>$person['address']],
-                            ["text"=>"Copy Email","switch_inline_query_current_chat"=>$person['email']]
-                        ]];
-
-                        sendMessage($chatId, $formatted, $buttons);
-                    }
-                }
-
-            } else {
+            if (!isset($data['success']) || !$data['success']) {
                 sendMessage($chatId, "⚠️ API call failed!");
+                exit;
+            }
+
+            if (isset($data['result']['message'])) {
+                sendMessage($chatId, "⚠️ <b>No data found!</b>\nContact admin @$adminContact.");
+                exit;
+            }
+
+            // Modern theme: single card with copy buttons
+            foreach ($data['result'] as $person) {
+                $formatted = "🛸 <b>Alien Scan Report</b> 🛸\n\n";
+                $formatted .= "📱 <b>Mobile:</b> <code>$text</code>\n";
+                $formatted .= "👤 <b>Name:</b> " . htmlspecialchars($person['name']) . "\n";
+                $formatted .= "🖊 <b>Father:</b> " . htmlspecialchars($person['father_name']) . "\n";
+                $formatted .= "🌍 <b>Address:</b> " . htmlspecialchars($person['address']) . "\n";
+                $formatted .= "📞 <b>Alt Mobile:</b> " . htmlspecialchars($person['alt_mobile']) . "\n";
+                $formatted .= "📡 <b>Circle:</b> " . htmlspecialchars($person['circle']) . "\n";
+                $formatted .= "🆔 <b>ID Number:</b> " . htmlspecialchars($person['id_number']) . "\n";
+                $formatted .= "📧 <b>Email:</b> " . htmlspecialchars($person['email']) . "\n";
+
+                $buttons = [[
+                    ["text"=>"Copy Mobile","switch_inline_query_current_chat"=>$text],
+                    ["text"=>"Copy Alt Mobile","switch_inline_query_current_chat"=>$person['alt_mobile']],
+                    ["text"=>"Copy ID","switch_inline_query_current_chat"=>$person['id_number']],
+                    ["text"=>"Copy Address","switch_inline_query_current_chat"=>$person['address']],
+                    ["text"=>"Copy Email","switch_inline_query_current_chat"=>$person['email']]
+                ]];
+
+                sendMessage($chatId, $formatted, $buttons);
             }
 
         } else {
-            sendMessage($chatId, "⚠️ Invalid input.\nSend a valid 10-digit mobile number.");
+            sendMessage($chatId, "⚠️ Invalid input. Send a valid 10-digit mobile number.");
         }
         break;
 }
 
-// Save credits & users
+// Save data
 function saveData() {
     global $credits, $users, $creditsFile, $usersFile;
     file_put_contents($creditsFile, json_encode($credits));
@@ -147,9 +148,9 @@ function saveData() {
 function sendMessage($chatId, $msg, $buttons = null) {
     global $apiURL;
     $data = ["chat_id" => $chatId, "text" => $msg, "parse_mode" => "HTML"];
-    if ($buttons) $data["reply_markup"] = json_encode(["inline_keyboard" => $buttons]);
+    if ($buttons) $data["reply_markup"] = json_encode(["inline_keyboard"=>$buttons]);
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $apiURL . "sendMessage");
+    curl_setopt($ch, CURLOPT_URL, $apiURL."sendMessage");
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
