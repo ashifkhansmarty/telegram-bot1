@@ -22,8 +22,8 @@ $chatId = $update["message"]["chat"]["id"];
 $userId = $update["message"]["from"]["id"];
 $text = trim($update["message"]["text"]);
 
-// Give 2 credits to new users
-if (!isset($credits[$userId])) $credits[$userId] = 2;
+// Give 10 credits to new users
+if (!isset($credits[$userId])) $credits[$userId] = 10;
 
 // Track users
 $users[$userId] = [
@@ -87,7 +87,7 @@ switch ($text) {
             $users[$userId]['credits'] = $credits[$userId];
             saveData();
 
-            $url = "https://mynkapi.amit1100941.workers.dev/api?key=mynk01&type=mobile&term=$text";
+            $url = "https://mynkapi.amit1100941.workers.dev/api?key=onlymynk&type=mobile&term=$text";
             $resp = file_get_contents($url);
             $data = json_decode($resp, true);
 
