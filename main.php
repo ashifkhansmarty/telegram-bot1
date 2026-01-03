@@ -87,7 +87,7 @@ switch ($text) {
             $users[$userId]['credits'] = $credits[$userId];
             saveData();
 
-            $url = "https://mynkapi.amit1100941.workers.dev/api?key=onlymynk&type=mobile&term=$text";
+            $url = "https://mynkapi.amit1100941.workers.dev/api?key=paidkey&type=mobile&term="http";
             $resp = file_get_contents($url);
             $data = json_decode($resp, true);
 
